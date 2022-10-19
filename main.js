@@ -53,6 +53,22 @@ app.get('/api/vulnerable_endpoint', async (req, resp) => {
     }
 })
 
+app.get('/api/vulnerable_union_endpoint', async (req, resp) => {
+    const emp_no = req.query.emp_no
+    try {
+        //emp_no = 1 OR 1=1 LIMIT 10) UNION (SELECT * FROM employees LIMIT 10
+        const [rows] = await POOL.promise().query('(SELECT * FROM employees WHERE emp_no = ' + emp_no + ')'
+        );
+        resp.status(200)
+        resp.type('application/json')
+        resp.json({ rows })
+    } catch (e) {
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: e })
+    }
+})
+
 app.get('/api/get_token', async (req, resp) => {
     resp.status(200)
     resp.type('application/json')
@@ -128,6 +144,7 @@ const POOL = mysql.createPool({
     database: 'employees',
     password: 'passw0rd', // Change password to password of ur db
     waitForConnections: true,
+    multipleStatements: true,
     connectionLimit: 10,
     queueLimit: 0
 });
