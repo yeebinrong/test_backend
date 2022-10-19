@@ -21,20 +21,43 @@ app.use(express.json())
 // Apply cors headers to resp
 app.use(cors())
 
-// Sign a jwt token
-const signToken = (payload) => {
+const signToken = () => {
     const currTime = (new Date()).getTime() / 1000
     const signedToken = jwt.sign({
-        ...payload,
         iss: 'tic2301',
         iat: currTime,
     }, 'secret_key')
     return `Bearer ${signedToken}`
 }
 
+const escapeQuotes = (str) => {
+    return `${str}`.replace(/'/g, "''");
+}
+
 /* -------------------------------------------------------------------------- */
 //               ######## UNPROTECTED REQUESTS ########
 /* -------------------------------------------------------------------------- */
+
+app.get('/api/vulnerable_endpoint', async (req, resp) => {
+    const emp_no = req.query.emp_no
+    try {
+        const [rows] = await POOL.promise().query('SELECT * FROM employees WHERE emp_no = ' + emp_no
+        );
+        resp.status(200)
+        resp.type('application/json')
+        resp.json({ rows })
+    } catch (e) {
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: e })
+    }
+})
+
+app.get('/api/get_token', async (req, resp) => {
+    resp.status(200)
+    resp.type('application/json')
+    resp.json({ token: signToken() })
+})
 
 /* -------------------------------------------------------------------------- */
 //               ######## AUTHENTICATION MIDDLEWARE ########
@@ -70,6 +93,30 @@ app.use((req, resp, next) => {
 /* -------------------------------------------------------------------------- */
 //                 ######## PROTECTED REQUESTS ########
 /* -------------------------------------------------------------------------- */
+
+// 1. Require requests to have authorization header with valid token to prevent unauthorised users
+// 2. Sanitize inputs by using escapeQuotes
+// 3. Configure not to return error as response
+
+app.get('/api/protected_endpoint', async (req, resp) => {
+    const emp_no = req.query.emp_no
+    console.log("Unescaped emp_no: " + emp_no)
+    console.log("Escaped emp_no: " + escapeQuotes(emp_no))
+    try {
+        const [rows] = await POOL.promise().query('SELECT * FROM employees WHERE emp_no = ?',
+        [
+            escapeQuotes(emp_no) // Parameterise the query and escape the value
+        ]);
+        resp.status(200)
+        resp.type('application/json')
+        resp.json({ rows })
+    } catch (e) {
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: 'An error has occured. Please contact system administrators.' })
+        // Use generic error message instead of displaying error message to users.
+    }
+})
 
 /* -------------------------------------------------------------------------- */
 //                 ######## SERVER STUFF ########
