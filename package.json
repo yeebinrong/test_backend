@@ -15,5 +15,13 @@
   "bugs": {
     "url": "https://github.com/yeebinrong/test_backend/issues"
   },
-  "homepage": "https://github.com/yeebinrong/test_backend#readme"
+  "homepage": "https://github.com/yeebinrong/test_backend#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^8.5.1",
+    "morgan": "^1.10.0",
+    "mysql2": "^2.3.3",
+    "sha256": "^0.2.0"
+  }
 }
