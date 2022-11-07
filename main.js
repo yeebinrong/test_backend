@@ -69,6 +69,7 @@ app.get('/api/vulnerable_union_endpoint', async (req, resp) => {
     }
 })
 
+// Get token for Authorization header from this endpoint
 app.get('/api/get_token', async (req, resp) => {
     resp.status(200)
     resp.type('application/json')
@@ -79,6 +80,7 @@ app.get('/api/get_token', async (req, resp) => {
 //               ######## AUTHENTICATION MIDDLEWARE ########
 /* -------------------------------------------------------------------------- */
 
+// SKIP THIS PART, GO TO PROTECTED REQUESTS
 app.use((req, resp, next) => {
     const auth = req.get('Authorization')
     if (auth == null || auth == '') {
@@ -110,19 +112,83 @@ app.use((req, resp, next) => {
 //                 ######## PROTECTED REQUESTS ########
 /* -------------------------------------------------------------------------- */
 
-// 1. Require requests to have authorization header with valid token to prevent unauthorised users
-// 2. Sanitize inputs by using escapeQuotes
-// 3. Configure not to return error as response
+// 1. All endpoints below here will require Authorization header in the request
+// You can retrieve the token from the get_token api at line 73, this prevents
+// unauthorised users from accessing the endpoint
 
-app.get('/api/protected_endpoint', async (req, resp) => {
-    const emp_no = req.query.emp_no
-    console.log("Unescaped emp_no: " + emp_no)
-    console.log("Escaped emp_no: " + escapeQuotes(emp_no))
+// 2. All endpoints below here are also configured not to return the error from
+// the database, but rather a generic error, so users cannot infer the behaviour
+// from the error response.
+
+
+// Input first_name is escaped and validated before querying the database
+app.get('/api/validate_and_escape', async (req, resp) => {
+    let first_name = req.query.first_name
+    console.log("Unescaped first_name: " + first_name) // Escape Quotes
+    first_name = escapeQuotes(first_name)
+    console.log("Escaped first_name: " + first_name)
+    console.log(`Validating input [${first_name}] to check if it is a string...`) // Validate Input
+    if (!(typeof first_name === 'string' || first_name instanceof String)) {
+        console.log(`Expected value [${first_name}] to be a string instead of ${typeof first_name}!`)
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: 'An error has occured. Please contact system administrators.' })
+        return
+    }
+    if (first_name.length > 16) {
+        console.log(`Value [${first_name}] is longer than accepted 16 char!`)
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: 'An error has occured. Please contact system administrators.' })
+        return
+    }
+    console.log(`Input [${first_name}] validated successfully...`)
     try {
+        console.log('Sending request to database...') // Eg. KEY = first_name VALUE = Georgi
+        const [rows] = await POOL.promise().query('SELECT * FROM employees WHERE first_name = \'' + first_name + '\' LIMIT 2');
+        console.log(`Response from database is: `)
+        console.log(rows)
+        resp.status(200)
+        resp.type('application/json')
+        resp.json({ rows })
+        return
+    } catch (e) {
+        console.log(e);
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: 'An error has occured. Please contact system administrators.' })
+        return
+    }
+})
+
+// Function to check if value is numeric
+const isNumeric = (value) => {
+    return /^-?\d+$/.test(value);
+}
+
+// On top of escaping and validating input, the query is parameterised
+app.get('/api/parameterised_query', async (req, resp) => {
+    let emp_no = req.query.emp_no
+    if (isNumeric(emp_no)) {
+        emp_no = parseInt(emp_no);
+    }
+    console.log(`Validating input [${emp_no}] to check if it is a number...`) // Validate Input
+    if (!(typeof emp_no === 'number' || emp_no instanceof Number)) {
+        console.log(`Expected value [${emp_no}] to be a number instead of ${typeof emp_no}!`)
+        resp.status(400)
+        resp.type('application/json')
+        resp.json({ error: 'An error has occured. Please contact system administrators.' })
+        return
+    }
+    console.log(`Input [${emp_no}] validated successfully...`)
+    try {
+        console.log('Sending request to database...') // Eg. KEY = emp_no VALUE = 10001
+        // Parameterise the query
         const [rows] = await POOL.promise().query('SELECT * FROM employees WHERE emp_no = ?',
-        [
-            escapeQuotes(emp_no) // Parameterise the query and escape the value
-        ]);
+            [ emp_no ],
+        );
+        console.log(`Response from database is: `)
+        console.log(rows)
         resp.status(200)
         resp.type('application/json')
         resp.json({ rows })
@@ -130,7 +196,6 @@ app.get('/api/protected_endpoint', async (req, resp) => {
         resp.status(400)
         resp.type('application/json')
         resp.json({ error: 'An error has occured. Please contact system administrators.' })
-        // Use generic error message instead of displaying error message to users.
     }
 })
 
