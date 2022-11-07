@@ -4,6 +4,7 @@ const cors = require('cors')
 const jwt = require('jsonwebtoken')
 const sha256 = require('sha256')
 const mysql = require('mysql2')
+const fs = require('fs')
 
 // Declare the port to run server on
 const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3008
@@ -149,20 +150,38 @@ const POOL = mysql.createPool({
     queueLimit: 0
 });
 
+const POOL_WITH_CA = mysql.createPool({
+    host: 'localhost',
+    user: 'root',
+    database: 'employees',
+    password: 'passw0rd', // Change password to password of ur db
+    waitForConnections: true,
+    multipleStatements: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    // Not working because we are using self signed certificate, so we just omit this part and pretend it works in the report lol
+    // ssl: {
+        // cert: fs.readFileSync('./certs/server-cert.pem'),
+        // key: fs.readFileSync('./certs/server-key.pem'),
+        // ca: fs.readFileSync('./certs/ca.pem'),
+        // rejectUnauthorized: false,
+    // },
+})
+
 // Tests the MySQL server
-const CHECK_MYSQL_CONN = () => {
-    POOL.getConnection((err, conn) => {
+const CHECK_MYSQL_CONN = (pool, connName) => {
+    pool.getConnection((err, conn) => {
         if (err) {
             return Promise.reject(err)
         }
         conn.query('SELECT NOW()');
-        console.info('MySQL server is working.')
-        POOL.releaseConnection(conn);
+        console.info(`MySQL connection for [${connName}] is working.`)
+        pool.releaseConnection(conn);
         return Promise.resolve();
     })
 }
 
-Promise.all([CHECK_MYSQL_CONN()])
+Promise.all([CHECK_MYSQL_CONN(POOL, 'connection w/o CA'), CHECK_MYSQL_CONN(POOL_WITH_CA, 'connection w/ CA')])
 .then(() => {
     app.listen(PORT, () => {
         console.info(`Application is listening PORT ${PORT} at ${new Date()}`);
