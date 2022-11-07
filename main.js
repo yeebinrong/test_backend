@@ -153,7 +153,7 @@ const POOL = mysql.createPool({
 const CHECK_MYSQL_CONN = () => {
     POOL.getConnection((err, conn) => {
         if (err) {
-            return Promise.reject(e)
+            return Promise.reject(err)
         }
         conn.query('SELECT NOW()');
         console.info('MySQL server is working.')
